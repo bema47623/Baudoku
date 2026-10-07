@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BauDoku - MALISAN & Energieberatung</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .active-pulse { animation: pulse 1.2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans pb-16 select-none">
+
+    <!-- Topbar -->
+    <header class="bg-slate-900 text-white sticky top-0 z-40 shadow">
+        <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 cursor-pointer" onclick="app.showCustomerList()">
+                <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center font-bold text-lg">B</div>
+                <div>
+                    <h1 class="text-base font-bold leading-tight">BauDoku</h1>
+                    <p class="text-xs text-slate-400">MALISAN & Energieberatung</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="torchBtn" onclick="app.toggleTorch()" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1 active:scale-95">
+                    <span>💡</span> <span id="torchLabel">Licht</span>
+                </button>
+                <button onclick="app.openNewCustomerModal()" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow active:scale-95">
+                    + Kunde
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto p-3 sm:p-4">
+
+        <!-- ANSICHT 1: Kundenliste -->
+        <section id="view-customer-list" class="space-y-3">
+            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 space-y-2">
+                <input type="text" id="searchInput" oninput="app.renderCustomerList()" placeholder="🔍 Kunde, Straße, Ort suchen..." class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div class="flex gap-1.5 overflow-x-auto pb-1 text-xs">
+                    <button onclick="app.setCompanyFilter('all')" class="company-filter-btn px-3 py-1.5 rounded-lg font-medium bg-slate-900 text-white" data-filter="all">Alle</button>
+                    <button onclick="app.setCompanyFilter('MALISAN')" class="company-filter-btn px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600" data-filter="MALISAN">MALISAN GmbH</button>
+                    <button onclick="app.setCompanyFilter('Energieberatung')" class="company-filter-btn px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600" data-filter="Energieberatung">Energieberatung</button>
+                </div>
+            </div>
+
+            <div id="customerCardsContainer" class="space-y-2"></div>
+        </section>
+
+        <!-- ANSICHT 2: Kundenakte -->
+        <section id="view-customer-detail" class="hidden space-y-3">
+            <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <button onclick="app.showCustomerList()" class="text-xs text-blue-600 font-semibold mb-1 flex items-center gap-1">
+                        ← Zur Kundenliste
+                    </button>
+                    <h2 id="detailCustomerName" class="text-lg font-bold text-slate-900 leading-snug">Kundenname</h2>
+                    <p id="detailCustomerMeta" class="text-xs text-slate-500">Firma | Ort</p>
+                </div>
+                <button onclick="app.editCurrentCustomer()" class="px-2.5 py-1.5 text-xs bg-slate-100 text-slate-700 rounded-lg font-medium border border-slate-200">
+                    Stammdaten
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-slate-200 bg-white rounded-t-xl px-2 pt-2 gap-1 overflow-x-auto text-xs font-bold">
+                <button onclick="app.switchTab('photos')" id="tabBtn-photos" class="px-4 py-2.5 rounded-t-lg border-b-2 border-blue-600 text-blue-600">
+                    📷 Fotos (<span id="photoBadge">0</span>)
+                </button>
+                <button onclick="app.switchTab('notes')" id="tabBtn-notes" class="px-4 py-2.5 rounded-t-lg border-b-2 border-transparent text-slate-500">
+                    📝 Notizen
+                </button>
+                <button onclick="app.switchTab('measure')" id="tabBtn-measure" class="px-4 py-2.5 rounded-t-lg border-b-2 border-transparent text-slate-500">
+                    📐 Aufmaß (<span id="measureBadge">0 m²</span>)
+                </button>
+            </div>
+
+            <!-- TAB FOTOS -->
+            <div id="tabContent-photos" class="bg-white p-4 rounded-b-xl shadow-sm border border-t-0 border-slate-200 space-y-4">
+                <button onclick="app.openBurstCamera()" class="w-full py-4 bg-blue-600 hover:bg-blue-500 active:scale-98 text-white rounded-2xl shadow-lg flex items-center justify-center gap-3 transition-all">
+                    <span class="text-2xl">📷</span>
+                    <div class="text-left">
+                        <div class="text-base font-bold leading-tight">Kamera öffnen</div>
+                        <div class="text-[11px] text-blue-100">Fotos machen & ohne Bestätigung direkt speichern</div>
+                    </div>
+                </button>
+
+                <div class="space-y-2 pt-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Gespeicherte Fotos</span>
+                        <span id="savedCounter" class="text-xs text-slate-400 font-semibold"></span>
+                    </div>
+                    <div id="photoGalleryContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5"></div>
+                </div>
+            </div>
+
+            <!-- TAB NOTIZEN -->
+            <div id="tabContent-notes" class="hidden bg-white p-4 rounded-b-xl shadow-sm border border-t-0 border-slate-200 space-y-2">
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Freie Notizen</span>
+                <textarea id="customerNotesInput" oninput="app.saveCustomerNotesAuto()" rows="12" placeholder="Notizen eintippen oder einfach die Sprachtaste der Handytastatur nutzen..." class="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed"></textarea>
+                <p class="text-[11px] text-slate-400">Wird beim Schreiben oder Sprechen automatisch im Hintergrund gespeichert.</p>
+            </div>
+
+            <!-- TAB AUFMAß -->
+            <div id="tabContent-measure" class="hidden bg-white p-4 rounded-b-xl shadow-sm border border-t-0 border-slate-200 space-y-4">
+                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-3">
+                    <span class="text-xs font-bold text-slate-600 uppercase tracking-wider block">Position erfassen</span>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Bezeichnung</label>
+                            <input type="text" id="mTitle" placeholder="z.B. Giebel Ostseite, Dachschräge..." class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Form / Typ</label>
+                            <select id="mShape" onchange="app.updateShapeInputs()" class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg font-semibold text-slate-800">
+                                <option value="rect">Rechteck (Wand / Decke) [L × H]</option>
+                                <option value="triangle">Dreieck (Giebel) [(B × H) ÷ 2]</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                            <label id="mDim1Label" class="text-xs text-slate-500 block mb-1">Länge / Basis (m)</label>
+                            <input type="number" step="0.01" id="mDim1" placeholder="z.B. 8.50" class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label id="mDim2Label" class="text-xs text-slate-500 block mb-1">Höhe (m)</label>
+                            <input type="number" step="0.01" id="mDim2" placeholder="z.B. 3.20" class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Abzug Fenster (m²)</label>
+                            <input type="number" step="0.01" id="mDeduction" placeholder="0.00" class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-500 block mb-1">Dämmstärke / Notiz</label>
+                            <input type="text" id="mDepth" placeholder="z.B. 7 cm Hohlschicht" class="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-1">
+                        <button onclick="app.addMeasurementPosition()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold shadow">
+                            + Position berechnen
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Erfasste Bauteile</span>
+                        <span id="mTotalSum" class="text-sm font-bold text-blue-600">Gesamt: 0.00 m²</span>
+                    </div>
+                    <div id="measureTableContainer" class="space-y-2"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- VOLLBILD KAMERA-SUCHER -->
+    <div id="burstCameraOverlay" class="hidden fixed inset-0 z-50 bg-black flex flex-col justify-between">
+        <div class="p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent text-white z-10">
+            <div>
+                <span id="burstCustName" class="text-sm font-bold block leading-tight">Kunde</span>
+                <span id="burstCountBadge" class="text-xs text-amber-400 font-medium">0 Fotos aufgenommen</span>
+            </div>
+            <button onclick="app.closeBurstCamera()" class="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-bold rounded-full backdrop-blur">
+                ✕ Beenden & Zurück
+            </button>
+        </div>
+
+        <div class="relative flex-1 flex items-center justify-center overflow-hidden">
+            <video id="burstVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <div id="burstFlash" class="absolute inset-0 bg-white opacity-0 pointer-events-none transition-opacity duration-100"></div>
+            
+            <div id="burstThumb" class="hidden absolute left-4 bottom-4 w-14 h-14 rounded-xl border-2 border-white shadow-xl overflow-hidden bg-black">
+                <img id="burstThumbImg" class="w-full h-full object-cover">
+            </div>
+        </div>
+
+        <div class="p-6 bg-gradient-to-t from-black/90 to-transparent flex items-center justify-center z-10">
+            <button onclick="app.takeBurstShot()" class="w-20 h-20 rounded-full border-4 border-white bg-red-600 hover:bg-red-500 active:scale-90 flex items-center justify-center shadow-2xl transition-all">
+                <div class="w-7 h-7 rounded-full bg-white"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: Kunde anlegen/bearbeiten -->
+    <div id="customerModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-2 sm:p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl p-4 sm:p-5 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b pb-2">
+                <h3 id="modalTitle" class="font-bold text-base text-slate-900">Kunde anlegen</h3>
+                <button onclick="app.closeCustomerModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">✕</button>
+            </div>
+            
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Firma</label>
+                    <select id="modalCompany" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-medium">
+                        <option value="MALISAN">MALISAN GmbH (Maler & Einblasdämmung)</option>
+                        <option value="Energieberatung">Energieberatung</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Name</label>
+                    <input type="text" id="modalName" placeholder="z.B. Familie Jansen" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Straße</label>
+                    <input type="text" id="modalStreet" placeholder="z.B. Bahnstraße 12" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                </div>
+                <div class="grid grid-cols-3 gap-2">
+                    <div>
+                        <label class="block text-slate-600 font-semibold mb-1">PLZ</label>
+                        <input type="text" id="modalZip" placeholder="47623" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block text-slate-600 font-semibold mb-1">Ort</label>
+                        <input type="text" id="modalCity" placeholder="Kevelaer" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Telefon</label>
+                    <input type="tel" id="modalPhone" placeholder="02832 / ..." class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                </div>
+                <div>
+                    <label class="block text-slate-600 font-semibold mb-1">Projekt / Gewerk</label>
+                    <input type="text" id="modalProject" placeholder="z.B. Einblasdämmung Hohlschicht" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                </div>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t">
+                <button onclick="app.closeCustomerModal()" class="w-1/2 py-2.5 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl">Abbrechen</button>
+                <button onclick="app.saveCustomer()" class="w-1/2 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-xl shadow">Speichern</button>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="burstCanvas" class="hidden"></canvas>
+
+    <script>
+    class AppDB {
+        constructor() {
+            this.dbName = 'BauDoku_Final_DB';
+            this.db = null;
+        }
+
+        async init() {
+            return new Promise((resolve) => {
+                const req = indexedDB.open(this.dbName, 1);
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('customers')) db.createObjectStore('customers', { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', { keyPath: 'id' });
+                };
+                req.onsuccess = (e) => { this.db = e.target.result; resolve(true); };
+                req.onerror = () => resolve(false);
+            });
+        }
+
+        async getAllCustomers() {
+            if (!this.db) return JSON.parse(localStorage.getItem('bdf_customers') || '[]');
+            return new Promise((resolve) => {
+                const tx = this.db.transaction('customers', 'readonly');
+                const req = tx.objectStore('customers').getAll();
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = () => resolve([]);
+            });
+        }
+
+        async saveCustomer(customer) {
+            if (!this.db) {
+                const list = JSON.parse(localStorage.getItem('bdf_customers') || '[]');
+                const idx = list.findIndex(c => c.id === customer.id);
+                if (idx >= 0) list[idx] = customer; else list.unshift(customer);
+                localStorage.setItem('bdf_customers', JSON.stringify(list));
+                return;
+            }
+            return new Promise((resolve) => {
+                const tx = this.db.transaction('customers', 'readwrite');
+                tx.objectStore('customers').put(customer);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async getPhotos(customerId) {
+            if (!this.db) {
+                const list = JSON.parse(localStorage.getItem('bdf_photos') || '[]');
+                return list.filter(p => p.customerId === customerId);
+            }
+            return new Promise((resolve) => {
+                const tx = this.db.transaction('photos', 'readonly');
+                const req = tx.objectStore('photos').getAll();
+                req.onsuccess = () => resolve((req.result || []).filter(p => p.customerId === customerId));
+                req.onerror = () => resolve([]);
+            });
+        }
+
+        async savePhoto(photo) {
+            if (!this.db) {
+                const list = JSON.parse(localStorage.getItem('bdf_photos') || '[]');
+                list.unshift(photo);
+                try { localStorage.setItem('bdf_photos', JSON.stringify(list)); } catch(e){}
+                return;
+            }
+            return new Promise((resolve) => {
+                const tx = this.db.transaction('photos', 'readwrite');
+                tx.objectStore('photos').put(photo);
+                tx.oncomplete = () => resolve();
+            });
+        }
+
+        async deletePhoto(photoId) {
+            if (!this.db) {
+                let list = JSON.parse(localStorage.getItem('bdf_photos') || '[]');
+                list = list.filter(p => p.id !== photoId);
+                localStorage.setItem('bdf_photos', JSON.stringify(list));
+                return;
+            }
+            return new Promise((resolve) => {
+                const tx = this.db.transaction('photos', 'readwrite');
+                tx.objectStore('photos').delete(photoId);
+                tx.oncomplete = () => resolve();
+            });
+        }
+    }
+
+    class AppController {
+        constructor() {
+            this.db = new AppDB();
+            this.currentCustomer = null;
+            this.customers = [];
+            this.companyFilter = 'all';
+            this.burstStream = null;
+            this.shotCounter = 0;
+            this.torchActive = false;
+        }
+
+        async init() {
+            await this.db.init();
+            await this.loadCustomers();
+        }
+
+        async loadCustomers() {
+            this.customers = await this.db.getAllCustomers();
+            if (this.customers.length === 0) {
+                const sample = {
+                    id: 'sample-1',
+                    company: 'MALISAN',
+                    name: 'Musterkunde Kevelaer',
+                    street: 'Bahnstraße 14',
+                    zip: '47623',
+                    city: 'Kevelaer',
+                    phone: '02832 / 12345',
+                    project: 'Hohlschichtdämmung & Giebel',
+                    notes: 'Hohlschicht 7 cm gemessen. Giebelspitze vorbereiten.',
+                    measurements: [
+                        { id: 'm1', title: 'Giebel Südseite', shape: 'triangle', dim1: 8.5, dim2: 3.4, deduction: 1.5, depth: '7 cm', area: 12.95 }
+                    ]
+                };
+                await this.db.saveCustomer(sample);
+                this.customers = [sample];
+            }
+            this.renderCustomerList();
+        }
+
+        setCompanyFilter(filter) {
+            this.companyFilter = filter;
+            document.querySelectorAll('.company-filter-btn').forEach(btn => {
+                btn.className = (btn.dataset.filter === filter) 
+                    ? 'company-filter-btn px-3 py-1.5 rounded-lg font-medium bg-slate-900 text-white'
+                    : 'company-filter-btn px-3 py-1.5 rounded-lg font-medium bg-slate-100 text-slate-600';
+            });
+            this.renderCustomerList();
+        }
+
+        renderCustomerList() {
+            const query = (document.getElementById('searchInput').value || '').toLowerCase();
+            const container = document.getElementById('customerCardsContainer');
+            container.innerHTML = '';
+
+            const filtered = this.customers.filter(c => {
+                const matchComp = (this.companyFilter === 'all') || (c.company === this.companyFilter);
+                const matchQuery = (c.name || '').toLowerCase().includes(query) ||
+                                   (c.city || '').toLowerCase().includes(query) ||
+                                   (c.street || '').toLowerCase().includes(query) ||
+                                   (c.project || '').toLowerCase().includes(query);
+                return matchComp && matchQuery;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="text-center py-8 text-xs text-slate-400">Keine Kunden gefunden. "+ Kunde" tippen.</div>';
+                return;
+            }
+
+            filtered.forEach(c => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:border-blue-400 cursor-pointer space-y-1";
+                card.onclick = () => this.openCustomerDetail(c.id);
+                const isMalisan = c.company === 'MALISAN';
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-sm text-slate-900">${c.name || 'Unbenannter Kunde'}</h4>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isMalisan ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">${c.company || 'Firma'}</span>
+                    </div>
+                    <p class="text-xs text-slate-500">${c.street || ''} ${c.zip || ''} ${c.city || ''}</p>
+                    <div class="flex items-center justify-between pt-1 text-[11px] text-slate-400 border-t border-slate-100">
+                        <span>${c.project || 'Projekt'}</span>
+                        <span class="text-blue-600 font-semibold">Öffnen →</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        showCustomerList() {
+            this.closeBurstCamera();
+            document.getElementById('view-customer-list').classList.remove('hidden');
+            document.getElementById('view-customer-detail').classList.add('hidden');
+        }
+
+        async openCustomerDetail(customerId) {
+            this.currentCustomer = this.customers.find(c => c.id === customerId);
+            if (!this.currentCustomer) return;
+
+            document.getElementById('view-customer-list').classList.add('hidden');
+            document.getElementById('view-customer-detail').classList.remove('hidden');
+
+            document.getElementById('detailCustomerName').textContent = this.currentCustomer.name || 'Unbenannter Kunde';
+            document.getElementById('detailCustomerMeta').textContent = `${this.currentCustomer.company || ''} • ${this.currentCustomer.street || ''} ${this.currentCustomer.city || ''}`;
+            document.getElementById('customerNotesInput').value = this.currentCustomer.notes || '';
+
+            this.switchTab('photos');
+            this.renderMeasurements();
+            await this.renderPhotos();
+        }
+
+        switchTab(tab) {
+            ['photos', 'notes', 'measure'].forEach(t => {
+                const btn = document.getElementById(`tabBtn-${t}`);
+                const content = document.getElementById(`tabContent-${t}`);
+                if (t === tab) {
+                    btn.className = "px-4 py-2.5 rounded-t-lg border-b-2 border-blue-600 text-blue-600 font-bold";
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = "px-4 py-2.5 rounded-t-lg border-b-2 border-transparent text-slate-500 font-medium";
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        async openBurstCamera() {
+            if (!this.currentCustomer) return;
+
+            const overlay = document.getElementById('burstCameraOverlay');
+            const video = document.getElementById('burstVideo');
+            document.getElementById('burstCustName').textContent = this.currentCustomer.name || 'Kunde';
+            
+            this.shotCounter = 0;
+            document.getElementById('burstCountBadge').textContent = '0 Fotos aufgenommen';
+            document.getElementById('burstThumb').classList.add('hidden');
+
+            const constraintsList = [
+                { video: { facingMode: { exact: "environment" }, width: { ideal: 1920 } }, audio: false },
+                { video: { facingMode: "environment", width: { ideal: 1920 } }, audio: false },
+                { video: true, audio: false }
+            ];
+
+            let stream = null;
+            for (let c of constraintsList) {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(c);
+                    if (stream) break;
+                } catch(e) {}
+            }
+
+            if (!stream) {
+                alert("Kamera konnte nicht gestartet werden. Bitte Berechtigung prüfen.");
+                return;
+            }
+
+            this.burstStream = stream;
+            video.srcObject = stream;
+            overlay.classList.remove('hidden');
+        }
+
+        closeBurstCamera() {
+            if (this.burstStream) {
+                this.burstStream.getTracks().forEach(t => t.stop());
+                this.burstStream = null;
+            }
+            document.getElementById('burstCameraOverlay').classList.add('hidden');
+            this.renderPhotos();
+        }
+
+        async takeBurstShot() {
+            const video = document.getElementById('burstVideo');
+            const canvas = document.getElementById('burstCanvas');
+            const flash = document.getElementById('burstFlash');
+
+            if (!video || !this.burstStream) return;
+
+            flash.classList.remove('opacity-0');
+            setTimeout(() => flash.classList.add('opacity-0'), 100);
+
+            const maxDim = 1280;
+            let w = video.videoWidth || 640;
+            let h = video.videoHeight || 480;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+
+            const photoObj = {
+                id: 'p_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+                customerId: this.currentCustomer.id,
+                dataUrl: dataUrl,
+                timestamp: new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            };
+
+            await this.db.savePhoto(photoObj);
+
+            this.shotCounter++;
+            document.getElementById('burstCountBadge').textContent = `${this.shotCounter} Fotos aufgenommen`;
+            
+            const thumb = document.getElementById('burstThumb');
+            const img = document.getElementById('burstThumbImg');
+            img.src = dataUrl;
+            thumb.classList.remove('hidden');
+        }
+
+        async renderPhotos() {
+            if (!this.currentCustomer) return;
+            const photos = await this.db.getPhotos(this.currentCustomer.id);
+            document.getElementById('photoBadge').textContent = photos.length;
+            document.getElementById('savedCounter').textContent = `${photos.length} Fotos abgelegt`;
+
+            const container = document.getElementById('photoGalleryContainer');
+            container.innerHTML = '';
+
+            if (photos.length === 0) {
+                container.innerHTML = '<div class="col-span-full py-6 text-center text-xs text-slate-400">Noch keine Fotos abgelegt. Oben auf "Kamera öffnen" tippen!</div>';
+                return;
+            }
+
+            photos.forEach(p => {
+                const item = document.createElement('div');
+                item.className = "relative rounded-lg overflow-hidden border border-slate-200 bg-slate-100 shadow-sm";
+                item.innerHTML = `
+                    <img src="${p.dataUrl}" class="w-full aspect-square object-cover">
+                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-1.5 flex items-center justify-between text-white text-[10px]">
+                        <span>${p.timestamp}</span>
+                        <button onclick="app.removePhoto('${p.id}')" class="text-red-300 hover:text-white font-bold px-1">Löschen</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async removePhoto(id) {
+            await this.db.deletePhoto(id);
+            await this.renderPhotos();
+        }
+
+        async toggleTorch() {
+            try {
+                if (!this.burstStream) {
+                    this.burstStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } }
+                    });
+                }
+                const track = this.burstStream.getVideoTracks()[0];
+                const caps = track.getCapabilities ? track.getCapabilities() : {};
+                if (caps.torch) {
+                    this.torchActive = !this.torchActive;
+                    await track.applyConstraints({ advanced: [{ torch: this.torchActive }] });
+                    const btn = document.getElementById('torchBtn');
+                    const lbl = document.getElementById('torchLabel');
+                    if (this.torchActive) {
+                        btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-400 text-slate-900 shadow flex items-center gap-1";
+                        lbl.textContent = "Licht AN";
+                    } else {
+                        btn.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 text-slate-300 border border-slate-700 flex items-center gap-1";
+                        lbl.textContent = "Licht";
+                    }
+                } else {
+                    alert("Taschenlampe wird von diesem Gerät / Browser nicht unterstützt.");
+                }
+            } catch(e) {
+                alert("Licht: " + e.message);
+            }
+        }
+
+        async saveCustomerNotesAuto() {
+            if (!this.currentCustomer) return;
+            this.currentCustomer.notes = document.getElementById('customerNotesInput').value;
+            await this.db.saveCustomer(this.currentCustomer);
+        }
+
+        updateShapeInputs() {
+            const shape = document.getElementById('mShape').value;
+            const l1 = document.getElementById('mDim1Label');
+            const l2 = document.getElementById('mDim2Label');
+            if (shape === 'triangle') {
+                l1.textContent = "Breite / Basis (m)";
+                l2.textContent = "Giebelhöhe (m)";
+            } else {
+                l1.textContent = "Länge (m)";
+                l2.textContent = "Höhe (m)";
+            }
+        }
+
+        async addMeasurementPosition() {
+            if (!this.currentCustomer) return;
+            const title = document.getElementById('mTitle').value || 'Position';
+            const shape = document.getElementById('mShape').value;
+            const dim1 = parseFloat(document.getElementById('mDim1').value) || 0;
+            const dim2 = parseFloat(document.getElementById('mDim2').value) || 0;
+            const deduction = parseFloat(document.getElementById('mDeduction').value) || 0;
+            const depth = document.getElementById('mDepth').value || '';
+
+            const rawArea = (shape === 'triangle') ? ((dim1 * dim2) / 2.0) : (dim1 * dim2);
+            const netArea = Math.max(0, rawArea - deduction);
+
+            const pos = {
+                id: 'm_' + Date.now(),
+                title, shape, dim1, dim2, deduction, depth,
+                area: parseFloat(netArea.toFixed(2))
+            };
+
+            if (!this.currentCustomer.measurements) this.currentCustomer.measurements = [];
+            this.currentCustomer.measurements.push(pos);
+            await this.db.saveCustomer(this.currentCustomer);
+
+            document.getElementById('mTitle').value = '';
+            document.getElementById('mDim1').value = '';
+            document.getElementById('mDim2').value = '';
+            document.getElementById('mDeduction').value = '';
+            document.getElementById('mDepth').value = '';
+
+            this.renderMeasurements();
+        }
+
+        async removeMeasurement(posId) {
+            if (!this.currentCustomer || !this.currentCustomer.measurements) return;
+            this.currentCustomer.measurements = this.currentCustomer.measurements.filter(m => m.id !== posId);
+            await this.db.saveCustomer(this.currentCustomer);
+            this.renderMeasurements();
+        }
+
+        renderMeasurements() {
+            const container = document.getElementById('measureTableContainer');
+            const badge = document.getElementById('measureBadge');
+            const totalSum = document.getElementById('mTotalSum');
+            container.innerHTML = '';
+
+            const list = this.currentCustomer?.measurements || [];
+            let total = 0;
+
+            list.forEach(m => {
+                total += (m.area || 0);
+                const isTri = m.shape === 'triangle';
+                const row = document.createElement('div');
+                row.className = "p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs";
+                row.innerHTML = `
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-1.5 font-bold text-slate-800">
+                            <span class="px-1.5 py-0.5 rounded text-[10px] ${isTri ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200 text-slate-700'}">
+                                ${isTri ? 'Dreieck (Giebel)' : 'Rechteck'}
+                            </span>
+                            <span>${m.title}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-500">
+                            ${m.dim1} m × ${m.dim2} m ${isTri ? '÷ 2' : ''} 
+                            ${m.deduction > 0 ? `| Abzug: -${m.deduction} m²` : ''} 
+                            ${m.depth ? `| ${m.depth}` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="font-bold text-slate-900 text-sm">${m.area.toFixed(2)} m²</span>
+                        <button onclick="app.removeMeasurement('${m.id}')" class="text-red-500 font-bold px-1">✕</button>
+                    </div>
+                `;
+                container.appendChild(row);
+            });
+
+            badge.textContent = `${total.toFixed(1)} m²`;
+            totalSum.textContent = `Gesamt: ${total.toFixed(2)} m²`;
+        }
+
+        openNewCustomerModal() {
+            this.currentCustomer = null;
+            document.getElementById('modalTitle').textContent = "Neuer Kunde";
+            document.getElementById('modalCompany').value = this.companyFilter !== 'all' ? this.companyFilter : 'MALISAN';
+            document.getElementById('modalName').value = '';
+            document.getElementById('modalStreet').value = '';
+            document.getElementById('modalZip').value = '';
+            document.getElementById('modalCity').value = '';
+            document.getElementById('modalPhone').value = '';
+            document.getElementById('modalProject').value = '';
+            document.getElementById('customerModal').classList.remove('hidden');
+        }
+
+        editCurrentCustomer() {
+            if (!this.currentCustomer) return;
+            document.getElementById('modalTitle').textContent = "Stammdaten bearbeiten";
+            document.getElementById('modalCompany').value = this.currentCustomer.company || 'MALISAN';
+            document.getElementById('modalName').value = this.currentCustomer.name || '';
+            document.getElementById('modalStreet').value = this.currentCustomer.street || '';
+            document.getElementById('modalZip').value = this.currentCustomer.zip || '';
+            document.getElementById('modalCity').value = this.currentCustomer.city || '';
+            document.getElementById('modalPhone').value = this.currentCustomer.phone || '';
+            document.getElementById('modalProject').value = this.currentCustomer.project || '';
+            document.getElementById('customerModal').classList.remove('hidden');
+        }
+
+        closeCustomerModal() {
+            document.getElementById('customerModal').classList.add('hidden');
+        }
+
+        async saveCustomer() {
+            const isNew = !this.currentCustomer;
+            const customerObj = this.currentCustomer || {
+                id: 'c_' + Date.now(),
+                notes: '',
+                measurements: []
+            };
+
+            customerObj.company = document.getElementById('modalCompany').value;
+            customerObj.name = document.getElementById('modalName').value.trim() || 'Unbenannter Kunde';
+            customerObj.street = document.getElementById('modalStreet').value.trim();
+            customerObj.zip = document.getElementById('modalZip').value.trim();
+            customerObj.city = document.getElementById('modalCity').value.trim();
+            customerObj.phone = document.getElementById('modalPhone').value.trim();
+            customerObj.project = document.getElementById('modalProject').value.trim();
+
+            await this.db.saveCustomer(customerObj);
+            await this.loadCustomers();
+            this.closeCustomerModal();
+
+            if (isNew) {
+                this.openCustomerDetail(customerObj.id);
+            } else {
+                document.getElementById('detailCustomerName').textContent = customerObj.name;
+                document.getElementById('detailCustomerMeta').textContent = `${customerObj.company} • ${customerObj.street} ${customerObj.city}`;
+            }
+        }
+    }
+
+    const app = new AppController();
+    window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
